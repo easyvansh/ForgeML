@@ -1,0 +1,10 @@
+{
+  "initial_loss": 3.475135232227821,
+  "final_loss": 1.5602703264382771,
+  "validation_loss": 1.5623425216645066,
+  "parameters": 9224,
+  "steps": 80,
+  "tokens_seen": 5120,
+  "seconds": 0.5594885000027716,
+  "claim": "Local character smoke run; validation is held out but corpus is tiny and not representative."
+}

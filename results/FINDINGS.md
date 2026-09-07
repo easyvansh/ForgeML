@@ -12,6 +12,10 @@ Reloading saved weights produced `0,1,2,3,4,5,6,7,0,1,2,3,4,5` from the prompt `
 
 ## CPU attention pilot
 
+## Local text validation smoke run
+
+`configs/char_smoke.json` reads the checked-in text file, builds a character vocabulary, and holds out the final 20% of the corpus. The 9,224-parameter model trained for 80 updates and processed 5,120 training-token presentations. Training loss decreased from 3.475135 to 1.560270; held-out loss was 1.562343. This validates the data/validation plumbing on a tiny repeated corpus. It is not evidence of natural-language quality, scaling, or generalization beyond this file.
+
 Arrays: B=1, H=2, D=16, float64; streaming tile=32; seven timed calls per method after a correctness/warmup call. Seed 42. Dense always ran first. Values below are observed medians.
 
 | Context | Dense, ms | Streaming, ms | Maximum absolute error |

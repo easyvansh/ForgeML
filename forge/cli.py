@@ -10,6 +10,7 @@ from .nn import Transformer
 from .tensor import Tensor,cross_entropy,no_grad
 from .optim import SGD,Adam,AdamW
 from .attention import dense_attention,streaming_attention
+from .data import CharDataset
 
 def system_info():
     info={'python':platform.python_version(),'numpy':np.__version__,'platform':platform.platform(),'backend':'numpy-cpu','dtype':'float64'}
@@ -21,24 +22,37 @@ def train(config,output):
     cfg=json.loads(Path(config).read_text()); out=Path(output); out.mkdir(parents=True,exist_ok=False)
     (out/'config.json').write_text(json.dumps(cfg,indent=2))
     (out/'system.json').write_text(json.dumps(system_info(),indent=2))
-    model=Transformer(**cfg['model']); tc=cfg['training']
+    tc=cfg['training']
+    if 'data' in cfg:
+        dataset=CharDataset.from_file(cfg['data']['path'],cfg['model']['context'],cfg['data'].get('validation_fraction',.1))
+        cfg['model']['vocab']=len(dataset.chars); batch=tc['batch_size']
+        (out/'data.json').write_text(json.dumps(dataset.metadata(),indent=2))
+        get_batch=lambda split,step: dataset.batch(split,batch,step,tc.get('seed',cfg['model'].get('seed',0)))
+    else:
+        vocab=cfg['model']['vocab']; context=cfg['model']['context']; batch=tc['batch_size']
+        ids=np.stack([(np.arange(context+1)+i)%vocab for i in range(batch)]); x,y=ids[:,:-1],ids[:,1:]
+        (out/'data.json').write_text(json.dumps({'kind':'synthetic-periodic-overfit','sha256':hashlib.sha256(ids.tobytes()).hexdigest(),'unique_training_positions':int(y.size),'validation':None},indent=2))
+        get_batch=lambda split,step:(x,y)
+    model=Transformer(**cfg['model'])
     opt={'sgd':SGD,'adam':Adam,'adamw':AdamW}[tc['optimizer']](model.parameters(),lr=tc['lr'])
-    # Deliberately synthetic periodic data: a correctness test, not generalization evidence.
-    vocab=cfg['model']['vocab']; context=cfg['model']['context']; batch=tc['batch_size']
-    ids=np.stack([(np.arange(context+1)+i)%vocab for i in range(batch)])
-    x,y=ids[:,:-1],ids[:,1:]
-    (out/'data.json').write_text(json.dumps({'kind':'synthetic-periodic-overfit','sha256':hashlib.sha256(ids.tobytes()).hexdigest(),'unique_training_positions':int(y.size),'validation':None},indent=2))
     start=time.perf_counter(); metrics=[]
     with (out/'metrics.jsonl').open('w') as f:
         for step in range(tc['steps']):
-            model.zero_grad(); loss=cross_entropy(model(x),y); loss.backward()
+            x,y=get_batch('train',step); model.zero_grad(); loss=cross_entropy(model(x),y); loss.backward()
             row={'step':step,'loss_before_update':float(loss.data),'tokens_seen':(step+1)*y.size,**opt.diagnostics()}
             opt.step(); row['elapsed_seconds']=time.perf_counter()-start
             f.write(json.dumps(row)+'\n'); metrics.append(row)
     model.eval()
-    with no_grad(): final=float(cross_entropy(model(x),y).data)
+    with no_grad():
+        x,y=get_batch('train',tc['steps']); final=float(cross_entropy(model(x),y).data)
+        validation=None
+        if 'data' in cfg:
+            vals=[]
+            for i in range(tc.get('eval_batches',4)):
+                vx,vy=get_batch('validation',tc['steps']+i); vals.append(float(cross_entropy(model(vx),vy).data))
+            validation=float(np.mean(vals))
     np.savez(out/'weights.npz',**{name:p.data for name,p in model.named_parameters()})
-    summary={'initial_loss':metrics[0]['loss_before_update'],'final_loss':final,'parameters':sum(p.data.size for p in model.parameters()),'steps':tc['steps'],'tokens_seen':tc['steps']*y.size,'seconds':time.perf_counter()-start,'claim':'Synthetic overfit only; no held-out validation or scaling result.'}
+    summary={'initial_loss':metrics[0]['loss_before_update'],'final_loss':final,'validation_loss':validation,'parameters':sum(p.data.size for p in model.parameters()),'steps':tc['steps'],'tokens_seen':tc['steps']*y.size,'seconds':time.perf_counter()-start,'claim':'Local character smoke run; validation is held out but corpus is tiny and not representative.' if validation is not None else 'Synthetic overfit only; no held-out validation or scaling result.'}
     (out/'summary.json').write_text(json.dumps(summary,indent=2)); print(json.dumps(summary,indent=2))
 
 def benchmark(output,seq,repeats):

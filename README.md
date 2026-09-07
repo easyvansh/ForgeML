@@ -13,6 +13,7 @@ Research question: under a limited budget, how should small Transformer models t
 - A pre-normalized decoder-only Transformer with learned positional embeddings and causal multi-head attention.
 - SGD with momentum, Adam, and AdamW.
 - Configured synthetic training, JSONL metrics, weight checkpoints, and greedy integer-token generation.
+- Local character language-model training with deterministic held-out validation, corpus hashing, and metadata.
 - Dense and tiled online-softmax attention **CPU forward references**.
 - Finite-difference checks, optional PyTorch comparisons, causal tests, and an end-to-end overfit test.
 
@@ -23,6 +24,7 @@ Run these commands from this repository. Python 3.10+ and NumPy are required.
 ```powershell
 python -m unittest discover -s tests -v
 python -m forge train configs/smoke.json --output runs/my-first-run
+python -m forge train configs/char_smoke.json --output runs/char-smoke
 python -m forge generate --checkpoint runs/my-first-run --prompt 0,1 --tokens 16
 python -m forge benchmark attention --seq 32 64 128 256 --output runs/attention.json
 ```
@@ -48,7 +50,7 @@ Installing the package also provides `forge`. `python -m forge` works directly f
 | Checkpoint generation | Correctly continues the periodic 0–7 sequence |
 | CPU streaming attention | Max absolute difference ≤ 5.56e-16 at tested contexts |
 
-These are smoke results, not validation loss on a language corpus. Full evidence is in [findings](results/FINDINGS.md), [raw metrics](results/smoke/metrics.jsonl), and [attention samples](results/attention.json). Timing is descriptive and local; no GPU speedup is claimed.
+The character run is a tiny smoke corpus, not evidence of broad language-model quality. Full evidence is in [findings](results/FINDINGS.md), [raw metrics](results/char_smoke/metrics.jsonl), and [attention samples](results/attention.json). Timing is descriptive and local; no GPU speedup is claimed.
 
 ## Project map
 

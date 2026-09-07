@@ -1,0 +1,9 @@
+{
+  "kind": "character-language-model",
+  "sha256": "f74b973e10827a63e1c85bfbf288b16c408e964244c86a3fcb9c0e605a4b19cf",
+  "characters": 32,
+  "total_tokens": 350,
+  "train_tokens": 280,
+  "validation_tokens": 70,
+  "context": 16
+}

@@ -1,0 +1,22 @@
+{
+  "data": {
+    "path": "data/smoke.txt",
+    "validation_fraction": 0.2
+  },
+  "model": {
+    "context": 16,
+    "width": 24,
+    "heads": 3,
+    "layers": 1,
+    "seed": 42
+  },
+  "training": {
+    "optimizer": "adamw",
+    "lr": 0.01,
+    "steps": 80,
+    "batch_size": 4,
+    "eval_interval": 20,
+    "eval_batches": 4,
+    "seed": 42
+  }
+}
