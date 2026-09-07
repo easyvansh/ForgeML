@@ -29,3 +29,15 @@ Capture GPU identity, driver/toolkit versions, dtype, shapes, warmups, clock/pow
 Use Nsight tools where supported to inspect launch overhead, occupancy, register usage, shared-memory utilization and memory traffic. Counter availability depends on hardware and permissions. Never substitute an analytic score-matrix size for measured HBM traffic. RTX hardware memory should be described as device/global memory rather than assuming every GPU uses HBM.
 
 The acceptance gate is a correct full training step, followed by profiling. A fast forward-only kernel is not sufficient for a training-runtime claim.
+
+## Windows build troubleshooting
+
+`nvcc` is the CUDA compiler, but on Windows it delegates host C++ compilation to Microsoft `cl.exe`. If `nvcc` says `Cannot find compiler 'cl.exe' in PATH`, open a **Developer Command Prompt for VS** or run the repository helper:
+
+```powershell
+.\scripts\build_cuda.ps1
+```
+
+The helper currently targets the detected Visual Studio 2019 Build Tools installation at `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools`. If the executable was not created, do not run it; PowerShell will correctly report that the path does not exist. After a successful build, invoke it with `.\build\cuda\attention_forward.exe 128`.
+
+If compilation succeeds but execution fails at `cudaMalloc`, compare `nvcc -V` with `nvidia-smi`. This machine currently reports toolkit 13.3 and driver CUDA compatibility 12.6. Install a compatible driver/toolkit pair: update the NVIDIA driver for CUDA 13.3, or install a CUDA 12.6 toolkit and compile with that `nvcc`. A successful compile does not prove that the runtime can launch on the installed driver.

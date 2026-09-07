@@ -5,7 +5,7 @@
 #include <vector>
 #include <algorithm>
 
-#define CUDA_OK(x) do { cudaError_t e=(x); if(e!=cudaSuccess){std::fprintf(stderr,"CUDA error %s:%d: %s\n",__FILE__,__LINE__,cudaGetErrorString(e)); return 2; } } while(0)
+#define CUDA_OK(x) do { cudaError_t e=(x); if(e!=cudaSuccess){std::fprintf(stderr,"CUDA error %s:%d: code=%d name=%s description=%s\n",__FILE__,__LINE__,(int)e,cudaGetErrorName(e),cudaGetErrorString(e)); return 2; } } while(0)
 
 // One thread computes one (batch, head, query, channel) output. The score
 // row is streamed with online max/sum updates, so no T x T score matrix is
@@ -13,11 +13,11 @@
 __global__ void causal_attention(const float* q,const float* k,const float* v,float* out,int B,int H,int T,int D){
   int index=blockIdx.x*blockDim.x+threadIdx.x; int total=B*H*T*D; if(index>=total) return;
   int d=index%D, t=(index/D)%T, h=(index/(D*T))%H, b=index/(D*T*H); float scale=rsqrtf((float)D);
-  float m=-CUDART_INF_F, l=0.0f, acc=0.0f; int qbase=(((b*H+h)*T+t)*D);
+  float m=-INFINITY, l=0.0f, acc=0.0f; int qbase=(((b*H+h)*T+t)*D);
   for(int j=0;j<=t;j++){
     int base=(((b*H+h)*T+j)*D); float score=0.0f;
     for(int c=0;c<D;c++) score += q[qbase+c]*k[base+c]; score*=scale;
-    float next=fmaxf(m,score); float old=(m==-CUDART_INF_F)?0.0f:expf(m-next); float p=expf(score-next);
+    float next=fmaxf(m,score); float old=(isinf(m))?0.0f:expf(m-next); float p=expf(score-next);
     acc=old*acc+p*v[base+d]; l=old*l+p; m=next;
   }
   out[index]=acc/l;
