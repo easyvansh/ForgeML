@@ -17,11 +17,12 @@ Updated 2026-09-07. This document is the authoritative status report. A checked 
 
 ## In progress
 
-- Custom CUDA implementation is now the active next milestone; PyTorch is the reference baseline, not ForgeML's custom kernel.
+- Custom CUDA forward milestone is implemented as a standalone correctness-first kernel; it still needs binding into the training runtime.
 
 ## Remaining implementation
 
 - Add device-aware Tensor storage and C++/CUDA extension boundaries.
+- Bind the verified attention forward kernel into the training runtime and add a backward kernel.
 - Implement and test CUDA vector/reduction/softmax/normalization primitives.
 - Implement attention forward and backward kernels; validate against CPU and PyTorch at non-multiple tile sizes.
 - Add CUDA-event timing, peak allocation tracking, profiler metadata and warmup protocols.
