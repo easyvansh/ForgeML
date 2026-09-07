@@ -14,6 +14,7 @@ Updated 2026-09-07. This document is the authoritative status report. A checked 
 - CUDA-enabled PyTorch 2.14.0+cu126 in `.venv`; `torch.cuda.is_available()` is true on the RTX 3060 Laptop GPU.
 - PyTorch gradient and optimizer parity: 25 tests pass, including both formerly optional reference tests.
 - Reproducible PyTorch CUDA attention baseline at contexts 128, 256 and 512 with CUDA-event timings and memory artifacts.
+- Custom CUDA causal forward kernel executes at contexts 128, 256, and 512 with maximum CPU-reference error `2.98e-7`; raw JSONL output is checked in.
 
 ## In progress
 
