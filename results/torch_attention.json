@@ -1,0 +1,95 @@
+{
+  "system": {
+    "torch": "2.14.0+cu126",
+    "torch_cuda": "12.6",
+    "gpu": "NVIDIA GeForce RTX 3060 Laptop GPU",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "dtype": "float16"
+  },
+  "results": [
+    {
+      "implementation": "sdpa",
+      "context": 128,
+      "median_seconds": 0.0002722559729591012,
+      "samples_seconds": [
+        0.0014519360065460205,
+        0.0002721920013427734,
+        0.0001730560064315796,
+        0.0002887679934501648,
+        0.00027225598692893983
+      ],
+      "allocated_bytes": 263168,
+      "reserved_bytes": 2097152
+    },
+    {
+      "implementation": "materialized",
+      "context": 128,
+      "median_seconds": 0.00037785599124617875,
+      "samples_seconds": [
+        0.00038502401113510134,
+        0.00036351999640464784,
+        0.00037785598635673524,
+        0.00036556801199913024,
+        0.0004382719993591309
+      ],
+      "allocated_bytes": 9060352,
+      "reserved_bytes": 23068672
+    },
+    {
+      "implementation": "sdpa",
+      "context": 256,
+      "median_seconds": 0.00021708800341002643,
+      "samples_seconds": [
+        0.00022220799326896668,
+        0.0002170879989862442,
+        0.00022015999257564545,
+        0.00021401600539684294,
+        0.00021401600539684294
+      ],
+      "allocated_bytes": 9044992,
+      "reserved_bytes": 23068672
+    },
+    {
+      "implementation": "materialized",
+      "context": 256,
+      "median_seconds": 0.00037683200207538903,
+      "samples_seconds": [
+        0.0003696640133857727,
+        0.0003717119991779327,
+        0.00040140798687934875,
+        0.0003768320083618164,
+        0.0003788799941539764
+      ],
+      "allocated_bytes": 10158080,
+      "reserved_bytes": 23068672
+    },
+    {
+      "implementation": "sdpa",
+      "context": 512,
+      "median_seconds": 0.0003430399810895324,
+      "samples_seconds": [
+        0.00034201601147651673,
+        0.0003686400055885315,
+        0.00034303998947143557,
+        0.0003409920036792755,
+        0.00034303998947143557
+      ],
+      "allocated_bytes": 9569280,
+      "reserved_bytes": 23068672
+    },
+    {
+      "implementation": "materialized",
+      "context": 512,
+      "median_seconds": 0.0013721599243581295,
+      "samples_seconds": [
+        0.001277951955795288,
+        0.0012595200538635255,
+        0.0076912641525268555,
+        0.0017623039484024048,
+        0.0013721599578857423
+      ],
+      "allocated_bytes": 14024704,
+      "reserved_bytes": 23068672
+    }
+  ]
+}
