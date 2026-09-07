@@ -16,6 +16,7 @@ Updated 2026-09-07. This document is the authoritative status report. A checked 
 - Reproducible PyTorch CUDA attention baseline at contexts 128, 256 and 512 with CUDA-event timings and memory artifacts.
 - Custom CUDA causal forward kernel executes at contexts 128, 256, and 512 with maximum CPU-reference error `2.98e-7`; raw JSONL output is checked in.
 - Shared-memory tiled CUDA forward reference compiles and executes at contexts 128, 256 and 512 with maximum CPU-reference error `2.98e-7`; raw JSONL output is checked in.
+- Standalone CUDA attention backward reference computes `dQ`, `dK`, and `dV` and matches the CPU reference within `3.82e-6` at contexts 127, 256 and 513; raw JSONL output is checked in.
 
 ## In progress
 
@@ -24,9 +25,9 @@ Updated 2026-09-07. This document is the authoritative status report. A checked 
 ## Remaining implementation
 
 - Add device-aware Tensor storage and C++/CUDA extension boundaries.
-- Bind the verified attention forward kernel into the training runtime and add a backward kernel.
+- Bind the verified attention forward and backward kernels into the training runtime.
 - Implement and test CUDA vector/reduction/softmax/normalization primitives.
-- Implement attention forward and backward kernels; validate against CPU and PyTorch at non-multiple tile sizes.
+- Validate the standalone attention forward and backward kernels against PyTorch at non-multiple tile sizes.
 - Add CUDA-event timing, peak allocation tracking, profiler metadata and warmup protocols.
 - Add exact resume state: optimizer moments, counters, RNG, scheduler and sampler position.
 - Add a licensed, pinned corpus and tokenizer; the checked-in character corpus is only a plumbing smoke test.

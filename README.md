@@ -62,6 +62,7 @@ See the [standalone architecture source](docs/figures/architecture.mmd).
 - The PyTorch CUDA attention baseline used float16, batch 1, four heads, head dimension 64, CUDA events, warmup, and five timed samples at contexts 128, 256, and 512.
 - The custom CUDA forward kernel executes at contexts 128, 256, and 512 with maximum CPU-reference error `2.98e-7`; its launch-time sweep is preserved in `results/cuda_attention_forward.jsonl`.
 - A shared-memory tiled forward reference reports CPU-reference error `2.98e-7` at contexts 128, 256 and 512; measurements are preserved in `results/cuda_attention_tiled.jsonl`.
+- A standalone CUDA backward reference validates `dQ`, `dK`, and `dV` within `3.82e-6` at contexts 127, 256 and 513; measurements are preserved in `results/cuda_attention_backward.jsonl`.
 
 ![GPU attention memory baseline](docs/figures/attention_memory.svg)
 

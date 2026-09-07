@@ -31,3 +31,12 @@ The shared-memory tiled reference is built and run with:
 ```
 
 It stages K/V tiles in shared memory and reports CPU-reference parity. Sweep all tracked contexts with `.scripts\run_tiled_cuda_sweep.ps1`. This is not yet a warp-specialized production kernel.
+
+The standalone backward reference validates `dQ`, `dK`, and `dV` against a CPU implementation, including non-multiple context lengths:
+
+```powershell
+.\scripts\build_backward_cuda.ps1
+.\scripts\run_backward_cuda_sweep.ps1
+```
+
+The backward sweep is a correctness harness; it is not yet bound to ForgeML tensors or used by training.
