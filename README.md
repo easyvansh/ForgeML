@@ -65,6 +65,8 @@ paper/          Living research report and LaTeX manuscript
 
 Start with [the research proposal](docs/research-proposal.md), [architecture](docs/architecture.md), and [reproduction guide](docs/reproduction.md). The [paper](paper/main.md) reports only existing evidence and labels future studies explicitly.
 
+For a current project status, read the [implementation audit](docs/AUDIT.md). The complete [literature packet](docs/papers.md) records the eight papers and how each motivates a ForgeML component.
+
 ## Next milestones
 
 1. Complete PyTorch full-model and optimizer parity, input validation, FP32 support, and resumable optimizer/RNG state.
