@@ -1,89 +1,152 @@
 # ForgeML
 
-**A minimal Transformer runtime for studying compute-efficient learning.**
+### A research runtime for compute-efficient Transformer training
 
-Status: **v0.1 CPU correctness baseline**. The long-term objective is a GPU-native training runtime; this release uses NumPy storage and independently implemented reverse-mode autodiff. It does not yet run training on the GPU.
+[![Tests](https://github.com/easyvansh/ForgeML/actions/workflows/tests.yml/badge.svg)](https://github.com/easyvansh/ForgeML/actions/workflows/tests.yml)
+[![ML systems](https://img.shields.io/badge/research-ML%20systems-2563eb)](https://github.com/easyvansh/ForgeML)
+[![CUDA](https://img.shields.io/badge/CUDA-forward%20kernel%20in%20progress-76b900)](cuda/README.md)
 
-Research question: under a limited budget, how should small Transformer models trade parameters, training tokens, and context, and when does IO-aware attention change the achievable allocation?
+ForgeML is a small, inspectable deep-learning runtime built around one question:
 
-## What works today
+> Under a limited compute budget, how should small Transformer language models trade model size, training tokens, context length, and GPU memory movement?
 
-- Float64 tensors, broadcasting, reductions, rank-2-or-higher batched matrix multiplication, indexing, and reverse-mode gradients.
-- Linear layers, embeddings, LayerNorm, approximate GELU, dropout primitive, and stable cross entropy.
-- A pre-normalized decoder-only Transformer with learned positional embeddings and causal multi-head attention.
-- SGD with momentum, Adam, and AdamW.
-- Configured synthetic training, JSONL metrics, weight checkpoints, and greedy integer-token generation.
-- Local character language-model training with deterministic held-out validation, corpus hashing, and metadata.
-- CUDA-enabled PyTorch reference tests and a GPU attention baseline with CUDA-event timings and memory measurements.
-- Dense and tiled online-softmax attention **CPU forward references**.
-- Finite-difference checks, optional PyTorch comparisons, causal tests, and an end-to-end overfit test.
+It connects mathematical foundations, ML experimentation, GPU systems engineering, and reproducible research infrastructure in one narrow thesis.
 
-## Quick start
+## Current status
 
-Run these commands from this repository. Python 3.10+ and NumPy are required.
+**Working CPU runtime + verified PyTorch CUDA baseline + first custom CUDA forward kernel.**
 
-```powershell
-python -m unittest discover -s tests -v
-python -m forge train configs/smoke.json --output runs/my-first-run
-python -m forge train configs/char_smoke.json --output runs/char-smoke
-python -m forge generate --checkpoint runs/my-first-run --prompt 0,1 --tokens 16
-python -m forge benchmark attention --seq 32 64 128 256 --output runs/attention.json
+The local environment has PyTorch `2.14.0+cu126`, CUDA runtime `12.6`, and an NVIDIA RTX 3060 Laptop GPU. ForgeML’s own Tensor runtime remains NumPy-based on CPU. The custom CUDA source compiles after loading Visual Studio’s `cl.exe`; execution still requires a compatible driver/toolkit pair because this machine reports toolkit 13.3 while the driver reports compatibility 12.6.
+
+The project does not claim a custom-kernel speedup until the kernel executes, passes parity, and is profiled.
+
+## What has been built
+
+| Layer | Implementation | Evidence |
+|---|---|---|
+| Tensor runtime | NumPy tensors, broadcasting, reductions, indexing, batched matmul | `forge/tensor.py` |
+| Autodiff | Reverse-mode graph traversal, VJPs, accumulation, finite differences | 25-test suite |
+| Neural network API | Linear, embedding, LayerNorm, GELU, dropout, causal attention | `forge/nn.py` |
+| Language model | Pre-LN decoder-only Transformer with learned positions | Smoke runs |
+| Optimization | Momentum SGD, Adam, AdamW | PyTorch update parity |
+| Data | Deterministic character dataset, held-out split, SHA-256 metadata | `forge/data.py` |
+| GPU reference | PyTorch SDPA/materialized attention with CUDA events and memory counters | `results/torch_attention.json` |
+| Custom CUDA | Online-softmax causal forward source and Windows build helper | `cuda/attention_forward.cu` |
+| Research record | Proposal, audit, engineering log, paper draft, figures, CI | `docs/`, `paper/`, `.github/` |
+
+## System at a glance
+
+```mermaid
+flowchart LR
+  DATA[Local text + hash] --> BATCH[Deterministic batches]
+  BATCH --> TENSOR[ForgeML Tensor]
+  TENSOR --> AD[Reverse-mode autodiff]
+  AD --> MODEL[Decoder Transformer]
+  MODEL --> LOSS[Stable cross entropy]
+  LOSS --> OPT[SGD / Adam / AdamW]
+  OPT --> CKPT[Metrics + checkpoint]
+  MODEL --> CPU[CPU attention oracle]
+  MODEL --> TORCH[PyTorch CUDA reference]
+  TORCH --> PROFILE[CUDA events + memory]
+  MODEL -. next .-> CUSTOM[ForgeML CUDA backend]
+  CUSTOM -.-> PROFILE
 ```
 
-The current computer already has NumPy. For a separate environment:
+See the [standalone architecture source](docs/figures/architecture.mmd).
 
-```powershell
-python -m venv .venv
-.venv\Scripts\python -m pip install -e .
-.venv\Scripts\python -m forge train configs/smoke.json --output runs/isolated-smoke
-```
+## Measured findings
 
-Installing the package also provides `forge`. `python -m forge` works directly from the checkout without installation. Use a fresh output directory for each training run; existing runs are protected from overwrite.
+- **25 tests passed, 0 skipped** in the project virtual environment, including PyTorch gradient and optimizer comparisons.
+- A 3,832-parameter synthetic Transformer reduced loss from **2.085474 to 0.003107** after 120 updates.
+- The character smoke run trained a 9,224-parameter model from **3.475135 to 1.560270**; held-out loss was **1.562343**. This validates data plumbing on a tiny repeated corpus, not general language quality.
+- The PyTorch CUDA attention baseline used float16, batch 1, four heads, head dimension 64, CUDA events, warmup, and five timed samples at contexts 128, 256, and 512.
 
-## Measured results: September 7, 2026
+![GPU attention memory baseline](docs/figures/attention_memory.svg)
 
-| Check | Observed result |
-|---|---|
-| Unit/integration tests | 21 passed, 2 optional PyTorch tests skipped |
-| Synthetic model | 3,832 parameters, 1 layer, width 16, 2 heads |
-| Training loss | 2.085474 → 0.003107 after 120 updates |
-| Token presentations | 7,680, reusing the same 64 target positions |
-| Checkpoint generation | Correctly continues the periodic 0–7 sequence |
-| CPU streaming attention | Max absolute difference ≤ 5.56e-16 at tested contexts |
+![GPU attention latency baseline](docs/figures/attention_latency.svg)
 
-The character run is a tiny smoke corpus, not evidence of broad language-model quality. Full evidence is in [findings](results/FINDINGS.md), [raw metrics](results/char_smoke/metrics.jsonl), and [attention samples](results/attention.json). Timing is descriptive and local; no GPU speedup is claimed.
+These are PyTorch framework measurements, not custom ForgeML results. The materialized reference used more allocated memory than SDPA at every tested context. Full samples and hardware metadata are in [results/torch_attention.json](results/torch_attention.json).
 
-## Project map
+## The attention idea
+
+The custom kernel streams each score row with online normalization:
 
 ```text
-forge/          Tensor engine, layers, optimizers, attention references, CLI
-configs/        Reproducible executable configurations
-tests/          Numerical, behavioral, and integration checks
-docs/           Architecture, research protocol, roadmap, engineering log
-results/        Small checked-in baseline evidence
-paper/          Living research report and LaTeX manuscript
+m'     = max(m, row_max(scores))
+scale  = exp(m - m')
+probs  = exp(scores - m')
+ell'   = scale * ell + row_sum(probs)
+a'     = scale * a + probs @ values_tile
+output = a' / ell'
 ```
 
-Start with [the research proposal](docs/research-proposal.md), [architecture](docs/architecture.md), and [reproduction guide](docs/reproduction.md). The [paper](paper/main.md) reports only existing evidence and labels future studies explicitly.
+This avoids materializing a full `T × T` score matrix. The derivation is in [attention_algorithm.md](docs/figures/attention_algorithm.md).
 
-For a current project status, read the [implementation audit](docs/AUDIT.md). The complete [literature packet](docs/papers.md) records the eight papers and how each motivates a ForgeML component.
+## Reproduce locally
 
-## Next milestones
+```powershell
+cd D:\Projects\2026\forgeml
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install numpy setuptools wheel --trusted-host pypi.org --trusted-host files.pythonhosted.org
+python -m pip install -e . --no-build-isolation
+python -m unittest discover -s tests -v
+```
 
-1. Complete PyTorch full-model and optimizer parity, input validation, FP32 support, and resumable optimizer/RNG state.
-2. Add a licensed corpus, pinned tokenizer, document-disjoint splits, and held-out evaluation.
-3. Add CUDA storage/dispatch and verified forward/backward primitives; use a library GEMM for the training path while developing educational custom GEMM separately.
-4. Develop and profile causal tiled attention forward **and backward**.
-5. Run controlled optimizer and matched-budget experiments with independent seeds.
+Run the CPU language-model smoke experiment:
 
-The local GPU reports 6 GB VRAM. CUDA compiler availability must be resolved before GPU development; the CUDA version displayed by `nvidia-smi` does not establish an installed toolkit. See [GPU design](docs/cuda.md).
+```powershell
+python -m forge train configs/char_smoke.json --output runs/char-smoke
+```
 
-## Scope and limitations
+Run the PyTorch GPU reference:
 
-No CUDA backend, mixed precision, attention backward optimization, real-corpus pipeline, scaling-law fit, or publishable GPU findings are claimed. Weight files support inference, not exact training resume. All tensors currently use float64. Matrix multiplication deliberately requires rank ≥ 2. Gradients are retained on leaves only. Do not modify tensor data between forward and backward. The Transformer currently has no dropout in its blocks, although a tested standalone dropout layer is available.
+```powershell
+.\.venv\Scripts\python.exe benchmarks/torch_attention.py --seq 128 256 512 1024 --repeats 20 --output results/torch_attention.json
+```
 
-No remote repository has been created. This is a local Git repository. No distribution license has been selected yet; choose one before publishing.
+Build the custom CUDA forward kernel:
 
-## Visual research record
+```powershell
+.\scripts\build_cuda.ps1
+.\build\cuda\attention_forward.exe 128
+```
 
-The [figure manifest](docs/figures/README.md) collects the architecture diagram, online-attention algorithm, and measured GPU baseline charts. Every chart points back to `results/torch_attention.json`; it is intended to make the system inspectable and the evidence easy to review.
+## Research questions
+
+1. Can an independently implemented runtime reproduce trusted numerical behavior?
+2. How do SGD, Adam, and AdamW compare under equal initialization, batches, tuning budget, and token budget?
+3. When context grows, how much memory and time does IO-aware attention recover?
+4. Under fixed FLOPs and separately under fixed wall-clock time, how should parameters and token presentations be allocated?
+
+The project distinguishes unique corpus tokens from repeated presentations, fixed-FLOP budgets from fixed-time budgets, and CPU/PyTorch/custom-CUDA evidence. Planned results are never presented as measured findings.
+
+## Repository guide
+
+```text
+forge/                 Tensor, autodiff, layers, optimizers, CLI
+cuda/                  Custom CUDA source and build notes
+benchmarks/            PyTorch CUDA reference benchmark
+configs/               Reproducible experiment configurations
+tests/                 Numerical, parity, behavior, integration tests
+docs/                  Architecture, audit, protocols, figures, literature
+results/               Selected raw evidence and summaries
+paper/                 Living technical report and LaTeX manuscript
+.github/               CI and issue templates
+```
+
+Start with the [implementation audit](docs/AUDIT.md), [research proposal](docs/research-proposal.md), [reproduction guide](docs/reproduction.md), [literature packet](docs/papers.md), and [paper draft](paper/main.md). The [release checklist](RELEASE_CHECKLIST.md) describes what must be verified before tagging a release.
+
+## What remains
+
+- Align the NVIDIA driver/toolkit pair and execute the custom CUDA forward kernel.
+- Add CPU/PyTorch/custom-CUDA parity at partial tiles and extreme logits.
+- Add custom attention backward and bind CUDA tensors into ForgeML’s training path.
+- Add tiled shared-memory scheduling, then profile occupancy, registers, memory traffic, and launch overhead.
+- Run licensed-corpus, multi-seed optimizer, context, and model/token allocation studies.
+- Fit scaling relationships only after collecting enough independent observations and uncertainty estimates.
+- Replace the preliminary report with a final paper based on those results.
+
+## Research integrity
+
+Some explanatory documents were AI-assisted and are identified in the [documentation policy](docs/documentation-policy.md). Code claims are tied to tests or raw artifacts. The repository intentionally excludes virtual environments, secrets, profiler output, and unreviewed large model artifacts through [.gitignore](.gitignore).
