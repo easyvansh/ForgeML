@@ -5,7 +5,7 @@
 #include <vector>
 #include <algorithm>
 
-#define CUDA_OK(x) do { cudaError_t e=(x); if(e!=cudaSuccess){std::fprintf(stderr,"CUDA error %s:%d: code=%d name=%s description=%s\n",__FILE__,__LINE__,(int)e,cudaGetErrorName(e),cudaGetErrorString(e)); return 2; } } while(0)
+#define CUDA_OK(x) do { cudaError_t e=(x); if(e!=cudaSuccess){ const char* n=cudaGetErrorName(e); const char* s=cudaGetErrorString(e); std::fprintf(stderr,"CUDA error %s:%d: code=%d name=%s description=%s\n",__FILE__,__LINE__,(int)e,n?n:"unknown",s?s:"unknown"); if(e==cudaErrorInsufficientDriver) std::fprintf(stderr,"CUDA runtime is newer than the installed NVIDIA driver; update the driver or compile with a matching older toolkit.\n"); return 2; } } while(0)
 
 // One thread computes one (batch, head, query, channel) output. The score
 // row is streamed with online max/sum updates, so no T x T score matrix is
