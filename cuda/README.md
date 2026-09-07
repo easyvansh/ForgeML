@@ -30,4 +30,4 @@ The shared-memory tiled reference is built and run with:
 .\build\cuda\attention_tiled.exe 128
 ```
 
-It stages K/V tiles in shared memory for a correctness-first comparison. It is not yet a warp-specialized production kernel.
+It stages K/V tiles in shared memory and reports CPU-reference parity. Sweep all tracked contexts with `.scripts\run_tiled_cuda_sweep.ps1`. This is not yet a warp-specialized production kernel.

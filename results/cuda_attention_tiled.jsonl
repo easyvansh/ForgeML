@@ -1,0 +1,3 @@
+{"context":128,"max_abs_error":2.9802322e-07,"median_like_ms":0.096947,"launches":50,"kernel":"shared_memory_tiled_reference","shared_bytes":8192}
+{"context":256,"max_abs_error":2.9802322e-07,"median_like_ms":0.312484,"launches":50,"kernel":"shared_memory_tiled_reference","shared_bytes":8192}
+{"context":512,"max_abs_error":2.9802322e-07,"median_like_ms":1.065984,"launches":50,"kernel":"shared_memory_tiled_reference","shared_bytes":8192}
