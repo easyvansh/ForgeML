@@ -61,6 +61,7 @@ See the [standalone architecture source](docs/figures/architecture.mmd).
 - The character smoke run trained a 9,224-parameter model from **3.475135 to 1.560270**; held-out loss was **1.562343**. This validates data plumbing on a tiny repeated corpus, not general language quality.
 - The PyTorch CUDA attention baseline used float16, batch 1, four heads, head dimension 64, CUDA events, warmup, and five timed samples at contexts 128, 256, and 512.
 - The custom CUDA forward kernel executes at contexts 128, 256, and 512 with maximum CPU-reference error `2.98e-7`; its launch-time sweep is preserved in `results/cuda_attention_forward.jsonl`.
+- A shared-memory tiled forward reference also executes; its current measurements are exploratory until CPU-reference error reporting is added.
 
 ![GPU attention memory baseline](docs/figures/attention_memory.svg)
 
