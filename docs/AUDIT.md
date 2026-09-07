@@ -17,6 +17,7 @@ Updated 2026-09-07. This document is the authoritative status report. A checked 
 - Custom CUDA causal forward kernel executes at contexts 128, 256, and 512 with maximum CPU-reference error `2.98e-7`; raw JSONL output is checked in.
 - Shared-memory tiled CUDA forward reference compiles and executes at contexts 128, 256 and 512 with maximum CPU-reference error `2.98e-7`; raw JSONL output is checked in.
 - Standalone CUDA attention backward reference computes `dQ`, `dK`, and `dV` and matches the CPU reference within `3.82e-6` at contexts 127, 256 and 513; raw JSONL output is checked in.
+- Device-aware PyTorch runtime boundary exposes causal attention, autograd-compatible gradients, and CUDA/CPU primitives through `forge.cuda_backend`; portable tests cover the API.
 
 ## In progress
 
@@ -24,9 +25,9 @@ Updated 2026-09-07. This document is the authoritative status report. A checked 
 
 ## Remaining implementation
 
-- Add device-aware Tensor storage and C++/CUDA extension boundaries.
-- Bind the verified attention forward and backward kernels into the training runtime.
-- Implement and test CUDA vector/reduction/softmax/normalization primitives.
+- Replace the PyTorch dispatch in the runtime boundary with a compiled C++/CUDA extension around the verified kernels.
+- Bind that extension into the ForgeML Transformer training runtime.
+- Add custom CUDA vector/reduction/softmax/normalization implementations behind the existing primitive API.
 - Validate the standalone attention forward and backward kernels against PyTorch at non-multiple tile sizes.
 - Add CUDA-event timing, peak allocation tracking, profiler metadata and warmup protocols.
 - Add exact resume state: optimizer moments, counters, RNG, scheduler and sampler position.
