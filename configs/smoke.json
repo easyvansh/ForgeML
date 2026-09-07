@@ -1,0 +1,4 @@
+{
+  "model": {"vocab": 8, "context": 16, "width": 16, "heads": 2, "layers": 1, "seed": 42},
+  "training": {"optimizer": "adamw", "lr": 0.01, "steps": 120, "batch_size": 4}
+}
