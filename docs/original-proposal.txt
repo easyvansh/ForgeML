@@ -1,0 +1,1694 @@
+The final project should be **one research-grade ML systems project with a narrow thesis**, not “implement 12 famous papers.” The papers should form a chain where each one motivates the next engineering decision.
+
+# Final Project
+
+## **ForgeML: A GPU-Native Transformer Training Runtime for Studying Compute-Efficient Learning**
+
+**One-line description**
+
+> Build a small deep-learning framework from first principles—automatic differentiation, optimizers, Transformer layers and custom CUDA attention kernels—and use it to experimentally study how **model scale, training data, context length and GPU memory behavior interact under limited compute**.
+
+This gives you four signals simultaneously:
+
+**ML theory + ML experimentation + GPU/systems engineering + research methodology.**
+
+That combination is much stronger for AI/ML roles than either a pure CUDA project or a pure model-training project.
+
+---
+
+# 1. The central research question
+
+Everything should revolve around:
+
+> **Under a fixed, limited compute budget, how should small Transformer language models trade model size, training tokens and context length—and at what point do IO-aware GPU optimizations materially change that trade-off?**
+
+Then split that into four precise research questions.
+
+### RQ1 — Correctness
+
+> Can a minimal autodiff/runtime implementation reproduce PyTorch numerical behavior closely enough to train Transformer models reliably?
+
+### RQ2 — Optimization
+
+> How do SGD, Adam and AdamW affect convergence and generalization in small Transformer language models?
+
+### RQ3 — Systems
+
+> As context length increases, where does standard attention become bottlenecked by memory movement, and how much can an IO-aware tiled implementation recover?
+
+### RQ4 — Scaling
+
+> Under fixed compute budgets, how do model size and training-token allocation affect validation loss at small scale, and do the qualitative behaviors reported by scaling-law literature appear?
+
+These questions connect naturally.
+
+---
+
+# 2. The papers I would actually use
+
+Cut the literature down to **six core papers**.
+
+## Paper 1 — Automatic Differentiation in Machine Learning
+
+**Baydin et al., 2018**
+
+This gives you the theoretical basis for your runtime.
+
+The paper distinguishes automatic differentiation from symbolic and numerical differentiation and explains forward/reverse modes; reverse-mode AD is particularly important when differentiating scalar losses with respect to large parameter vectors, as in neural-network training. ([arXiv][1])
+
+### We extract
+
+* computational graphs
+* elementary operations
+* chain rule
+* reverse-mode AD
+* vector-Jacobian products
+* gradient accumulation
+
+### We build
+
+```text
+Tensor
+ ├─ data
+ ├─ grad
+ ├─ requires_grad
+ ├─ operation
+ └─ parents
+
+          ↓
+
+dynamic computation graph
+
+          ↓
+
+topological traversal
+
+          ↓
+
+backward()
+```
+
+This is your **ML foundations** section.
+
+---
+
+# 3. Paper 2 — Attention Is All You Need
+
+**Vaswani et al., 2017**
+
+This establishes the Transformer architecture based on attention rather than recurrence/convolution. ([DOI][2])
+
+You don't reproduce the whole original translation system.
+
+You extract its core architecture.
+
+### Implement
+
+$$
+Attention(Q,K,V)
+=
+softmax\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+$$
+
+along with:
+
+```text
+Token embedding
+      ↓
+Position representation
+      ↓
+Multi-head causal attention
+      ↓
+Residual
+      ↓
+Normalization
+      ↓
+MLP
+      ↓
+Residual
+      ↓
+× N
+      ↓
+Language-model head
+```
+
+This becomes your model workload.
+
+---
+
+# 4. Papers 3 + 4 — Adam and AdamW
+
+You don't need five optimizer papers.
+
+Use:
+
+### Adam — Kingma & Ba
+
+for adaptive optimization.
+
+And:
+
+### Decoupled Weight Decay Regularization — Loshchilov & Hutter
+
+for AdamW.
+
+AdamW is especially valuable because there is an experimentally testable distinction. Loshchilov and Hutter show that ordinary L2 regularization and weight decay are not equivalent for adaptive optimizers such as Adam, motivating decoupling weight decay from the gradient-based update. ([arXiv][3])
+
+### Implement exactly three optimizers
+
+```text
+SGD + Momentum
+
+Adam
+
+AdamW
+```
+
+Do not build RMSProp, Adagrad, Lion, etc.
+
+Those dilute the project.
+
+### Research experiment
+
+Same:
+
+* model
+* initialization
+* tokens
+* batches
+* learning-rate search budget
+
+Compare:
+
+```text
+training loss
+validation loss
+perplexity
+parameter norm
+gradient norm
+steps to target loss
+wall-clock convergence
+```
+
+That demonstrates actual ML experimentation.
+
+---
+
+# 5. Paper 5 — FlashAttention
+
+## This is the centerpiece.
+
+**Dao et al., 2022**
+
+FlashAttention identifies memory movement between GPU memory levels as a crucial attention bottleneck and uses tiling to reduce HBM reads/writes while computing exact attention. ([arXiv][4])
+
+This connects the ML project to NVIDIA-style systems engineering.
+
+Your implementation progression should be:
+
+```text
+ATTENTION V0
+Pure Python / NumPy reference
+        ↓
+
+ATTENTION V1
+naive CUDA kernels
+        ↓
+
+ATTENTION V2
+fused/tiled CUDA attention
+        ↓
+
+ATTENTION V3
+online softmax + IO-aware tiling
+```
+
+Importantly:
+
+**Do not claim you implemented FlashAttention unless you faithfully do so.**
+
+Call V3 something like:
+
+> **FlashAttention-inspired IO-aware tiled attention**
+
+That is accurate.
+
+---
+
+# 6. Paper 6 — FlashAttention-2
+
+Use it as a **systems analysis paper**, not something you promise to fully reproduce.
+
+FlashAttention-2 improves work partitioning across thread blocks and warps and reduces unnecessary non-matmul work and shared-memory communication. The published work reports significantly higher utilization than the first implementation on its target hardware. ([DOI][5])
+
+Use it to motivate experiments around:
+
+```text
+block size
+warp arrangement
+tile size
+shared memory usage
+occupancy
+register pressure
+```
+
+You might implement **one FA2-inspired scheduling/work-partitioning improvement**.
+
+That's enough.
+
+---
+
+# 7. Papers 7 + 8 — Scaling Laws and Chinchilla
+
+These should be treated together.
+
+Kaplan et al. identified empirical power-law relationships connecting language-model loss with parameters, dataset size and compute. ([arXiv][6])
+
+Hoffmann et al. later investigated compute-optimal training and found that, within their studied large-scale regime, increasing model size and training tokens together gave a better compute allocation than simply making models increasingly large. ([arXiv][7])
+
+You are **not reproducing Chinchilla**.
+
+You're testing:
+
+> Does a qualitatively similar compute/data/model-size tradeoff appear at 1M–50M parameter scale?
+
+That is scientifically much more respectable.
+
+---
+
+# Final literature stack
+
+That's it.
+
+| Layer        | Paper            | Purpose                    |
+| ------------ | ---------------- | -------------------------- |
+| Foundations  | Baydin et al.    | Autograd                   |
+| Architecture | Vaswani et al.   | Transformer                |
+| Optimization | Adam             | Adaptive optimization      |
+| Optimization | AdamW            | Regularization study       |
+| GPU systems  | FlashAttention   | IO-aware attention         |
+| GPU systems  | FlashAttention-2 | Work partitioning          |
+| Scaling      | Kaplan et al.    | Scaling hypothesis         |
+| Scaling      | Hoffmann et al.  | Compute-optimal hypothesis |
+
+**Eight papers.**
+
+Not twenty.
+
+---
+
+# 8. What ForgeML actually contains
+
+There are six technical systems.
+
+```text
+                         FORGEML
+                            │
+       ┌────────────────────┼────────────────────┐
+       │                    │                    │
+       ▼                    ▼                    ▼
+   ML RUNTIME          GPU RUNTIME          RESEARCH
+       │                    │                    │
+    Tensor               CUDA Ops           Experiments
+    Autograd                │                    │
+    Layers              Attention            Analysis
+    Losses                  │                    │
+    Optimizers          Profiling             Paper
+       │                    │
+       └─────────────┬──────┘
+                     ▼
+                 TRANSFORMER
+                     │
+                     ▼
+                TRAINING ENGINE
+                     │
+                     ▼
+               LANGUAGE MODEL
+```
+
+---
+
+# 9. Component A — Tensor engine
+
+Implement your own multidimensional Tensor object.
+
+### Minimum requirements
+
+```python
+Tensor(
+    data,
+    shape,
+    dtype,
+    requires_grad
+)
+```
+
+Support:
+
+* addition
+* subtraction
+* multiplication
+* division
+* matrix multiplication
+* sum
+* mean
+* reshape
+* transpose
+* broadcasting
+* indexing
+* exp
+* log
+* maximum
+
+You don't need to reproduce NumPy.
+
+---
+
+# 10. Component B — Autograd
+
+Every differentiable operation stores enough state to calculate its backward pass.
+
+For:
+
+$$
+C=AB
+$$
+
+derive:
+
+$$
+\frac{\partial L}{\partial A}
+=
+\frac{\partial L}{\partial C}B^T
+$$
+
+and:
+
+$$
+\frac{\partial L}{\partial B}
+=
+A^T\frac{\partial L}{\partial C}
+$$
+
+Implement:
+
+```python
+x = Tensor(..., requires_grad=True)
+w = Tensor(..., requires_grad=True)
+
+y = x @ w
+z = relu(y)
+loss = z.mean()
+
+loss.backward()
+```
+
+### Technical prowess #1
+
+Don't simply demonstrate that it runs.
+
+Implement automated **gradient checking**.
+
+Compare:
+
+```text
+ForgeML analytical gradient
+          vs
+finite differences
+          vs
+PyTorch autograd
+```
+
+Report:
+
+$$
+\text{relative error}
+=
+\frac{|g_{forge}-g_{reference}|}
+{|g_{forge}|+|g_{reference}|+\epsilon}
+$$
+
+This is exactly the kind of detail that makes the repo look serious.
+
+---
+
+# 11. Component C — Neural-network API
+
+Build:
+
+```python
+class Module:
+    parameters()
+    zero_grad()
+    train()
+    eval()
+```
+
+Then:
+
+```text
+Linear
+Embedding
+LayerNorm/RMSNorm
+ReLU/GELU
+Softmax
+Dropout
+MultiHeadAttention
+TransformerBlock
+```
+
+Don't spend a month making the API beautiful.
+
+Functionality > framework polish.
+
+---
+
+# 12. Component D — Optimizers
+
+Implement:
+
+```text
+SGD + momentum
+Adam
+AdamW
+```
+
+Your optimizer implementation should be readable enough that an interviewer can ask you to derive it.
+
+### Technical prowess #2
+
+Build optimizer diagnostics:
+
+```text
+parameter update magnitude
+gradient norm
+parameter norm
+effective learning rate
+loss trajectory
+```
+
+This turns optimizer code into observable research.
+
+---
+
+# 13. Component E — Transformer
+
+Build one GPT-style decoder-only Transformer.
+
+Do not attempt encoder-decoder + BERT + ViT + GPT.
+
+One architecture.
+
+Something like:
+
+```text
+Vocabulary: 16K–32K
+Context:    128–2048
+Layers:     2–12
+Heads:      4–12
+d_model:    128–768
+```
+
+Depending on experiment.
+
+---
+
+# 14. Model scale
+
+This is where we need discipline.
+
+Do **not** attempt a 1B model.
+
+It adds cost without improving the research story.
+
+Use approximately:
+
+| Name       | Parameters |
+| ---------- | ---------: |
+| Forge-Tiny |        ~1M |
+| Forge-S    |        ~3M |
+| Forge-M    |       ~10M |
+| Forge-L    |       ~30M |
+| Forge-XL   |       ~50M |
+
+You don't even necessarily need XL for every experiment.
+
+### Sweet spot
+
+Most work should happen around:
+
+**3–30M parameters.**
+
+That is big enough for meaningful behavior and small enough for repeated experiments.
+
+---
+
+# 15. Data scale
+
+Use a clean openly licensed/publicly available language-modelling dataset rather than scraping random copyrighted text.
+
+Target experimental subsets around:
+
+```text
+5M tokens
+10M
+25M
+50M
+100M
+250M
+```
+
+Not every model needs every dataset.
+
+Your scaling study will strategically sample combinations.
+
+---
+
+# 16. Why I would NOT use screenplay data for the main study
+
+Earlier I suggested connecting this to film.
+
+I would now remove that from the principal experiment.
+
+Why?
+
+Because this project's strongest narrative is:
+
+> **ML systems research.**
+
+A screenplay-specific corpus risks making recruiters focus on the novelty application rather than the technical contribution.
+
+Your Film background can become an optional downstream demo later.
+
+The core results should use a conventional language-modelling dataset.
+
+---
+
+# 17. Component F — GPU backend
+
+Initially:
+
+```text
+Python API
+   ↓
+C++ bindings
+   ↓
+CUDA
+```
+
+Implement custom kernels strategically.
+
+Not everything needs CUDA.
+
+Prioritize:
+
+### Kernel 1
+
+Vector operations
+
+### Kernel 2
+
+Reduction
+
+### Kernel 3
+
+Softmax
+
+### Kernel 4
+
+LayerNorm/RMSNorm
+
+### Kernel 5
+
+Matrix multiplication
+
+### Kernel 6
+
+Attention
+
+That is already substantial.
+
+---
+
+# 18. Where you demonstrate GPU knowledge
+
+Your project should explicitly expose:
+
+```text
+Thread
+  ↓
+Warp
+  ↓
+Thread block
+  ↓
+Grid
+```
+
+and:
+
+```text
+Registers
+   ↓
+Shared memory
+   ↓
+L2
+   ↓
+HBM
+```
+
+The technical documentation should discuss:
+
+* coalesced memory access
+* warp divergence
+* occupancy
+* register pressure
+* shared-memory banking
+* synchronization
+* tiling
+* arithmetic intensity
+* kernel launch overhead
+
+That's the NVIDIA signal.
+
+---
+
+# 19. The attention experiment
+
+This should be your signature systems contribution.
+
+Test:
+
+```text
+context length
+
+128
+256
+512
+1024
+2048
+4096
+```
+
+across:
+
+### Baseline A
+
+PyTorch SDPA/reference where appropriate.
+
+### Baseline B
+
+ForgeML naive implementation.
+
+### Kernel C
+
+ForgeML naive CUDA.
+
+### Kernel D
+
+ForgeML tiled attention.
+
+### Kernel E
+
+ForgeML IO-aware attention.
+
+Measure:
+
+```text
+forward latency
+backward latency
+
+peak GPU memory
+
+tokens/sec
+
+HBM traffic
+
+kernel occupancy
+
+effective bandwidth
+
+FLOP/s
+```
+
+---
+
+# 20. Generate plots like this
+
+### Attention memory
+
+```text
+GPU Memory
+│
+│                        naive
+│                     /
+│                  /
+│               /
+│            /
+│         /
+│      /
+│    /
+│ ─────────────────── IO-aware
+│
+└────────────────────────────
+          context length
+```
+
+### Throughput
+
+```text
+tokens/s
+│
+│                 IO-aware
+│          ─────────────
+│       /
+│    tiled
+│   /
+│ naive
+│
+└────────────────────────────
+        sequence length
+```
+
+Real results determine the shapes; don't force expected outcomes.
+
+---
+
+# 21. Scaling experiment
+
+Now the project shifts from GPU engineering into AI research.
+
+Choose fixed compute budgets such as:
+
+```text
+C1
+C2
+C3
+C4
+```
+
+For each budget train combinations like:
+
+```text
+smaller model + more tokens
+
+medium model + medium tokens
+
+larger model + fewer tokens
+```
+
+For example:
+
+| Model | Params | Training tokens |
+| ----- | -----: | --------------: |
+| A     |     3M |            100M |
+| B     |    10M |             30M |
+| C     |    30M |             10M |
+
+Then compare validation loss.
+
+Repeat at several compute levels.
+
+---
+
+# 22. Fit a small-scale scaling relationship
+
+Something resembling:
+
+$$
+L(N)=L_\infty+aN^{-\alpha}
+$$
+
+and:
+
+$$
+L(D)=L_\infty+bD^{-\beta}
+$$
+
+You're not claiming to discover universal constants.
+
+Instead ask:
+
+> Across our restricted experimental regime, how stable are fitted scaling exponents?
+
+Report confidence intervals.
+
+---
+
+# 23. Technical prowess #3 — experimental methodology
+
+This is something most portfolio projects completely ignore.
+
+Use:
+
+### Random seeds
+
+At least 3 where computationally practical.
+
+### Controlled hyperparameters
+
+Don't compare algorithms under accidentally different conditions.
+
+### Confidence intervals
+
+Report uncertainty.
+
+### Ablations
+
+Change one important variable at a time.
+
+### Full run metadata
+
+Each experiment stores:
+
+```yaml
+model:
+  layers: 6
+  d_model: 384
+  heads: 6
+
+training:
+  batch_size: 32
+  lr: 0.0003
+  optimizer: adamw
+  tokens: 50000000
+
+system:
+  gpu: ...
+  cuda: ...
+  precision: fp16
+
+seed: 42
+```
+
+That's research infrastructure.
+
+---
+
+# 24. Technical prowess #4 — reproducibility
+
+One command should reproduce an experiment:
+
+```bash
+forge train configs/scaling/10m_50m.yaml
+```
+
+and another:
+
+```bash
+forge benchmark attention \
+  --seq 128 256 512 1024 2048
+```
+
+Output:
+
+```text
+runs/
+└── experiment-031/
+    ├── config.yaml
+    ├── metrics.jsonl
+    ├── checkpoint.bin
+    ├── system.json
+    └── profiler/
+```
+
+---
+
+# 25. Technical prowess #5 — correctness suite
+
+Before performance:
+
+**prove correctness.**
+
+Tests:
+
+```text
+Tensor operations
+      ↓
+finite-difference gradients
+
+CUDA kernels
+      ↓
+CPU reference
+
+Autograd
+      ↓
+PyTorch
+
+Optimizer
+      ↓
+PyTorch
+
+Attention
+      ↓
+reference implementation
+
+Full model
+      ↓
+tiny overfit test
+```
+
+Have hundreds of tests if warranted.
+
+This is particularly difficult to fake convincingly.
+
+---
+
+# 26. Technical prowess #6 — profiling
+
+Use NVIDIA profiling tooling where your hardware supports it.
+
+For important kernels capture:
+
+```text
+kernel duration
+SM utilization
+memory throughput
+occupancy
+shared memory
+register usage
+```
+
+Then write a short analysis for every optimization:
+
+### Example
+
+> V1 suffered from poor global-memory reuse because each thread repeatedly fetched elements used by neighboring threads.
+
+Then:
+
+> V2 tiled those values into shared memory.
+
+Then show evidence.
+
+That's significantly more impressive than:
+
+> “Improved performance 40%.”
+
+---
+
+# 27. What NOT to build
+
+Scope discipline matters enormously.
+
+Do not add:
+
+* RAG
+* vector database
+* agents
+* RLHF
+* distributed multi-node training
+* multimodality
+* reinforcement learning
+* web search
+* Kubernetes
+* complicated frontend
+* mobile app
+* 1B+ parameter model
+* custom tokenizer research
+* custom compiler
+* distributed database
+* inference autoscaling
+
+They can all be interesting.
+
+They make **this** project worse.
+
+---
+
+# 28. Optional final inference demo
+
+You can add a tiny demo:
+
+```text
+Prompt
+  ↓
+Forge Transformer
+  ↓
+ForgeML Tensor Engine
+  ↓
+CUDA
+  ↓
+Generated text
+```
+
+But it should represent perhaps **5% of the project**.
+
+No beautiful React UI required.
+
+A CLI is perfectly fine:
+
+```bash
+forge generate \
+  --checkpoint forge-30m.bin \
+  --prompt "The future of computing"
+```
+
+---
+
+# 29. Final repository structure
+
+```text
+forgeml/
+│
+├── forge/
+│   ├── tensor/
+│   │   ├── tensor.py
+│   │   ├── shape.py
+│   │   └── ops.py
+│   │
+│   ├── autograd/
+│   │   ├── graph.py
+│   │   ├── backward.py
+│   │   └── gradcheck.py
+│   │
+│   ├── nn/
+│   │   ├── module.py
+│   │   ├── linear.py
+│   │   ├── embedding.py
+│   │   ├── normalization.py
+│   │   └── attention.py
+│   │
+│   ├── optim/
+│   │   ├── sgd.py
+│   │   ├── adam.py
+│   │   └── adamw.py
+│   │
+│   └── transformer/
+│       ├── block.py
+│       ├── model.py
+│       └── generate.py
+│
+├── cpp/
+│
+├── cuda/
+│   ├── vector.cu
+│   ├── reduction.cu
+│   ├── matmul.cu
+│   ├── softmax.cu
+│   ├── normalization.cu
+│   └── attention/
+│       ├── naive.cu
+│       ├── tiled.cu
+│       └── io_aware.cu
+│
+├── training/
+│   ├── trainer.py
+│   ├── checkpoint.py
+│   └── mixed_precision.py
+│
+├── experiments/
+│   ├── correctness/
+│   ├── optimizers/
+│   ├── attention/
+│   ├── scaling/
+│   └── compute_optimal/
+│
+├── configs/
+│
+├── benchmarks/
+│
+├── tests/
+│
+├── analysis/
+│   ├── statistics/
+│   └── figures/
+│
+├── results/
+│
+├── paper/
+│   ├── main.tex
+│   ├── references.bib
+│   └── figures/
+│
+└── docs/
+    ├── autograd.md
+    ├── transformer.md
+    ├── cuda.md
+    ├── attention.md
+    └── experiments.md
+```
+
+---
+
+# 30. Development roadmap
+
+I would allocate about **10 weeks**, assuming ~15–20 meaningful hours/week.
+
+Not because an AI agent couldn't generate code faster.
+
+Because you need time to **understand and verify it**.
+
+## Week 0 — Foundations
+
+Read selected sections of:
+
+**Baydin**
+
+**Attention Is All You Need**
+
+Implement nothing serious yet.
+
+Write:
+
+```text
+docs/research-proposal.md
+```
+
+containing:
+
+* hypothesis
+* research questions
+* variables
+* baselines
+* metrics
+* expected computational limits
+
+This prevents wandering later.
+
+---
+
+# Week 1 — Tensor engine
+
+Build:
+
+* Tensor
+* shapes
+* basic operators
+* matrix multiplication
+* broadcasting
+* CPU reference backend
+
+Tests first.
+
+### Deliverable
+
+```python
+x = Tensor(...)
+y = Tensor(...)
+
+z = ((x @ y).relu()).mean()
+```
+
+works.
+
+---
+
+# Week 2 — Autograd
+
+Build:
+
+* graph construction
+* topological ordering
+* backward
+* gradient accumulation
+* broadcasting gradients
+
+Then gradient-check everything.
+
+### Milestone
+
+ForgeML gradients match finite differences and PyTorch within chosen numerical tolerances.
+
+---
+
+# Week 3 — Neural networks
+
+Build:
+
+* Module
+* Parameter
+* Linear
+* Embedding
+* activation
+* normalization
+* cross entropy
+* SGD
+* Adam
+* AdamW
+
+Train MNIST or another trivial benchmark.
+
+### Why?
+
+This validates the engine before introducing Transformers.
+
+---
+
+# Week 4 — Transformer
+
+Implement:
+
+```text
+Embedding
+Attention
+MLP
+Residuals
+Normalization
+Causal masking
+LM head
+```
+
+Train a tiny character/subword model.
+
+### Milestone
+
+Overfit a tiny dataset first.
+
+Then successfully train a 1–3M model.
+
+---
+
+# Week 5 — CUDA foundation
+
+Now start serious GPU work.
+
+Implement:
+
+```text
+vector ops
+reductions
+softmax
+matmul
+normalization
+```
+
+CPU/GPU correctness comparisons.
+
+Profile each.
+
+---
+
+# Week 6 — Attention kernels
+
+Implement:
+
+### V1
+
+Naive CUDA.
+
+### V2
+
+Tiled.
+
+### V3
+
+IO-aware.
+
+Study FlashAttention carefully during this phase.
+
+Benchmark sequence lengths.
+
+### This week is probably the most valuable part of the project for NVIDIA.
+
+---
+
+# Week 7 — Optimization study
+
+Run:
+
+```text
+SGD
+Adam
+AdamW
+```
+
+under controlled conditions.
+
+Generate:
+
+* convergence plots
+* parameter-norm plots
+* validation curves
+* tables
+
+Write first results section.
+
+---
+
+# Week 8 — Scaling study
+
+Train:
+
+```text
+1M
+3M
+10M
+30M
+```
+
+models across selected dataset budgets.
+
+Collect:
+
+```text
+parameters
+tokens
+compute
+loss
+wall-clock
+```
+
+Fit small-scale scaling curves.
+
+---
+
+# Week 9 — Compute-optimal study
+
+Inspired by Chinchilla.
+
+For matched compute:
+
+```text
+more parameters / fewer tokens
+
+balanced
+
+fewer parameters / more tokens
+```
+
+Compare outcomes.
+
+Then test whether attention optimization changes achievable sequence lengths/compute utilization.
+
+This is where the project's two halves finally connect.
+
+---
+
+# Week 10 — Paper + publication-quality repository
+
+Freeze experiments.
+
+Stop adding features.
+
+Produce:
+
+### Technical paper
+
+~10–15 pages.
+
+### README
+
+architecture + results.
+
+### Reproduction guide
+
+exact commands.
+
+### Benchmark tables
+
+real values.
+
+### Blog article
+
+accessible version.
+
+### Optional demo
+
+model generation.
+
+---
+
+# 31. Paper structure
+
+Final title:
+
+# **ForgeML: Studying Compute-Efficient Transformer Training through a Minimal GPU-Native Deep Learning Runtime**
+
+Paper:
+
+```text
+Abstract
+
+1 Introduction
+
+2 Background
+  2.1 Automatic Differentiation
+  2.2 Transformer Language Models
+  2.3 Optimization
+  2.4 GPU Memory Hierarchy
+  2.5 IO-Aware Attention
+  2.6 Neural Scaling Laws
+
+3 ForgeML
+  3.1 Tensor Runtime
+  3.2 Reverse-Mode Autograd
+  3.3 Neural Network Primitives
+  3.4 CUDA Backend
+  3.5 Transformer
+
+4 Attention Implementations
+  4.1 Reference
+  4.2 Naive CUDA
+  4.3 Tiled
+  4.4 IO-Aware
+
+5 Research Questions
+
+6 Experimental Methodology
+
+7 Runtime Correctness
+
+8 GPU Performance Results
+
+9 Optimizer Study
+
+10 Scaling Study
+
+11 Compute-Optimal Training
+
+12 Ablations
+
+13 Discussion
+
+14 Limitations
+
+15 Threats to Validity
+
+16 Related Work
+
+17 Conclusion
+```
+
+---
+
+# 32. The most important final experiment
+
+If there is one figure recruiters/researchers remember, make it this:
+
+### **Compute × model × context tradeoff**
+
+Show something like:
+
+```text
+                  Fixed Compute
+
+             MORE TRAINING TOKENS
+                     ▲
+                     │
+         small model │
+                     │        sweet spot
+                     │           ★
+                     │
+                     │
+                     │                   large model
+                     └──────────────────────────────►
+                         MORE PARAMETERS
+```
+
+Then separately show how your IO-aware implementation moves the feasible region when context length increases.
+
+That's the unique connecting idea:
+
+> **Algorithmic scaling tells us how we'd like to spend compute; systems efficiency determines how much useful compute we can actually extract from the hardware.**
+
+That's an excellent research narrative.
+
+---
+
+# 33. What makes this better than “I recreated PyTorch”
+
+The weak framing:
+
+> Built an ML library in Python.
+
+The strong framing:
+
+> Built a controlled experimental runtime because existing frameworks abstract away precisely the runtime behavior I wanted to measure.
+
+That gives the framework a **research justification**.
+
+You're not rebuilding PyTorch because it sounds difficult.
+
+You're rebuilding a small slice because you need control over:
+
+```text
+autograd
+optimizer implementation
+attention implementation
+GPU memory movement
+profiling
+training instrumentation
+```
+
+for the experiment.
+
+---
+
+# 34. What makes it believable even with AI assistance
+
+Keep an engineering log.
+
+For major decisions record:
+
+```text
+Problem
+Hypothesis
+Implementation
+Failure
+Profiler evidence
+Change
+Result
+```
+
+Example:
+
+```text
+EXP-024
+
+Problem:
+Softmax kernel slower than PyTorch.
+
+Hypothesis:
+Too many global-memory round trips.
+
+Change:
+Fuse max and normalization reductions.
+
+Result:
+...
+
+Remaining gap:
+...
+```
+
+Those artifacts are valuable evidence that you actually did the work.
+
+---
+
+# 35. What you should know by the end
+
+You should be able to explain without notes:
+
+### Math
+
+* chain rule
+* Jacobians/VJPs
+* backpropagation
+* softmax
+* cross entropy
+* self-attention
+* Adam
+* AdamW
+* perplexity
+
+### ML
+
+* overfitting
+* generalization
+* optimization
+* regularization
+* scaling laws
+* compute-optimal training
+* ablations
+* train/validation leakage
+
+### GPU
+
+* threads
+* warps
+* blocks
+* occupancy
+* shared memory
+* HBM
+* coalescing
+* tiling
+* arithmetic intensity
+* synchronization
+
+### Engineering
+
+* memory management
+* testing
+* profiling
+* benchmarking
+* reproducibility
+* numerical stability
+
+### Research
+
+* hypothesis
+* controls
+* confounders
+* significance
+* uncertainty
+* limitations
+* reproducibility
+
+That breadth is what makes this project unusually strong.
+
+---
+
+# 36. Final resume version
+
+Once real results exist:
+
+### **ForgeML — GPU-Native Transformer Training Runtime & ML Systems Research**
+
+**C++ · CUDA · Python · Deep Learning · GPU Systems**
+
+* Designed a deep-learning runtime from first principles with multidimensional tensors, reverse-mode automatic differentiation, neural-network primitives and SGD/Adam/AdamW optimization.
+* Implemented and profiled custom CUDA kernels for matrix multiplication, normalization, softmax and Transformer attention, including an IO-aware tiled attention implementation inspired by FlashAttention.
+* Conducted controlled language-model scaling experiments across **1M–30M+ parameters**, training-token budgets and context lengths to investigate compute-efficient training under constrained hardware.
+* Developed numerical gradient validation, PyTorch reference comparisons, reproducible experiment configuration and GPU profiling infrastructure.
+* Authored an independent technical report analyzing runtime correctness, optimizer behavior, GPU memory efficiency, scaling behavior, ablations and limitations.
+
+Then replace the generic pieces with real numbers:
+
+> reduced peak attention memory by **X%**
+
+> improved throughput by **Y× at 2048 context**
+
+> executed **N experimental runs**
+
+> trained models through **M tokens**
+
+Those measured results will matter enormously.
+
+---
+
+# 37. What I'd put on your resume alongside it
+
+You don't need six additional student projects.
+
+I'd use:
+
+| Priority | Project/Experience | What it proves                 |
+| -------- | ------------------ | ------------------------------ |
+| **1**    | **ForgeML**        | AI/ML + research + systems     |
+| **2**    | Shop Squad         | professional engineering       |
+| **3**    | News Nexus         | backend/software architecture  |
+| **4**    | ApplyIntel         | full-stack/product engineering |
+
+ForgeML becomes your **flagship**.
+
+Your existing work proves you can make products. ForgeML should prove you can understand and engineer the machinery underneath modern ML systems.
+
+And I would resist increasing the scope beyond this. If you execute **this exact project deeply**, with real CUDA profiling, controlled experiments, honest negative results and a strong technical report, it will be far more compelling than a superficially larger “LLM platform.”
+
+[1]: https://arxiv.org/abs/1502.05767?utm_source=chatgpt.com "Automatic differentiation in machine learning: a survey"
+[2]: https://doi.org/10.48550/ARXIV.1706.03762?utm_source=chatgpt.com "[1706.03762] Attention Is All You Need"
+[3]: https://arxiv.org/abs/1711.05101?utm_source=chatgpt.com "Decoupled Weight Decay Regularization"
+[4]: https://arxiv.org/abs/2205.14135?utm_source=chatgpt.com "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness"
+[5]: https://doi.org/10.48550/arXiv.2307.08691?utm_source=chatgpt.com "[2307.08691] FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning"
+[6]: https://arxiv.org/abs/2001.08361?utm_source=chatgpt.com "Scaling Laws for Neural Language Models"
+[7]: https://arxiv.org/abs/2203.15556?utm_source=chatgpt.com "Training Compute-Optimal Large Language Models"

@@ -1,0 +1,6 @@
+{
+  "kind": "synthetic-periodic-overfit",
+  "sha256": "799951f81283cadb58779ca72072544216bc8115ac2ac8fd150204fc4591eb8b",
+  "unique_training_positions": 64,
+  "validation": null
+}

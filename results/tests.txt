@@ -1,0 +1,28 @@
+test_accumulation (test_runtime.RuntimeTests.test_accumulation) ... ok
+test_adamw_decay (test_runtime.RuntimeTests.test_adamw_decay) ... ok
+test_broadcast (test_runtime.RuntimeTests.test_broadcast) ... ok
+test_causality (test_runtime.RuntimeTests.test_causality) ... ok
+test_cross_entropy (test_runtime.RuntimeTests.test_cross_entropy) ... ok
+test_dropout_eval (test_runtime.RuntimeTests.test_dropout_eval) ... ok
+test_elementwise_gradients (test_runtime.RuntimeTests.test_elementwise_gradients) ... ok
+test_extreme_logits (test_runtime.RuntimeTests.test_extreme_logits) ... ok
+test_full_model_parameter_gradient (test_runtime.RuntimeTests.test_full_model_parameter_gradient) ... ok
+test_layernorm (test_runtime.RuntimeTests.test_layernorm) ... ok
+test_matmul (test_runtime.RuntimeTests.test_matmul) ... ok
+test_no_grad (test_runtime.RuntimeTests.test_no_grad) ... ok
+test_optimizer_first_update (test_runtime.RuntimeTests.test_optimizer_first_update) ... ok
+test_overfit (test_runtime.RuntimeTests.test_overfit) ... ok
+test_reductions (test_runtime.RuntimeTests.test_reductions) ... ok
+test_repeated_index (test_runtime.RuntimeTests.test_repeated_index) ... ok
+test_reshape_transpose (test_runtime.RuntimeTests.test_reshape_transpose) ... ok
+test_seed_validation (test_runtime.RuntimeTests.test_seed_validation) ... ok
+test_sgd (test_runtime.RuntimeTests.test_sgd) ... ok
+test_softmax (test_runtime.RuntimeTests.test_softmax) ... ok
+test_streaming (test_runtime.RuntimeTests.test_streaming) ... ok
+test_batched_matmul (test_torch_reference.TorchParity.test_batched_matmul) ... skipped 'Optional PyTorch dependency is not installed'
+test_optimizers (test_torch_reference.TorchParity.test_optimizers) ... skipped 'Optional PyTorch dependency is not installed'
+
+----------------------------------------------------------------------
+Ran 23 tests in 0.759s
+
+OK (skipped=2)

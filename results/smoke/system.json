@@ -1,0 +1,8 @@
+{
+  "python": "3.11.4",
+  "numpy": "2.3.5",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "backend": "numpy-cpu",
+  "dtype": "float64",
+  "git_revision": "7b5fa9764c6333a21a8ba56207e6fd28681b745b"
+}

@@ -1,0 +1,9 @@
+{
+  "initial_loss": 2.085474226876963,
+  "final_loss": 0.0031068467933749533,
+  "parameters": 3832,
+  "steps": 120,
+  "tokens_seen": 7680,
+  "seconds": 0.5795260999984748,
+  "claim": "Synthetic overfit only; no held-out validation or scaling result."
+}

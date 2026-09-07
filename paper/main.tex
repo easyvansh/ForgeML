@@ -1,0 +1,57 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,booktabs,url}
+\title{ForgeML: Toward Studying Compute-Efficient Transformer Training through a Minimal Runtime}
+\author{Independent project report --- living draft v0.1}
+\date{September 7, 2026}
+\begin{document}
+\maketitle
+\begin{abstract}
+ForgeML is a minimal runtime intended to study model size, token allocation, context and attention implementation under constrained compute. The current release implements float64 CPU tensors, reverse-mode differentiation, three optimizers and a decoder-only Transformer. Twenty-one test methods pass; two optional PyTorch comparisons remain skipped. A 3,832-parameter model reduces synthetic loss from 2.0855 to 0.0031 after 120 updates. A forward-only streaming attention reference agrees with dense attention within $5.56\times10^{-16}$ in the recorded CPU pilot. These observations establish a limited correctness baseline, not GPU efficiency, language generalization or scaling laws.
+\end{abstract}
+\section{Introduction}
+The research question is how small Transformers should allocate parameters, token presentations and context under a constrained budget, and when attention implementation changes the feasible allocation. This manuscript reports the implemented CPU prerequisite. GPU training and real-corpus studies are planned, not completed. The expanded living report and operational details are provided in \texttt{main.md} and the repository documentation.
+\section{Background}
+Reverse-mode differentiation motivates the graph design \cite{baydin}. Attention supplies the workload \cite{vaswani}, while Adam and AdamW motivate optimizer comparisons \cite{adam,adamw}. FlashAttention motivates streaming normalization and future tiling \cite{flash}; FlashAttention-2 motivates work-partitioning analysis \cite{flash2}. Scaling studies motivate allocation hypotheses \cite{kaplan,hoffmann}. Their findings are not presumed to transfer unchanged to this project's small regime.
+\section{Runtime}
+NumPy provides float64 arrays and numerical kernels. ForgeML implements VJPs, iterative reverse topological execution, broadcast-gradient reduction and repeated-index scatter-add. Leaf gradients accumulate; intermediate gradients are ephemeral. Data must not be mutated between forward and backward. Rank-one matrix multiplication and higher-order differentiation are unsupported.
+
+The decoder uses learned token and position embeddings, pre-LayerNorm residual blocks, causal multi-head attention, an approximate GELU MLP and an untied output head. Cross entropy uses shifted log-sum-exp. SGD uses momentum, Adam uses coupled decay and AdamW uses decoupled decay. Inference weights are saved without pickle; exact training resume is not implemented.
+\section{Streaming attention}
+For a query tile, let $m$, $l$ and $A$ denote the running row maximum, exponential denominator and unnormalized value sum. With the next masked score tile $S$, update
+\begin{align}
+m' &= \max(m,\operatorname{rowmax}(S)),\\
+P &= \exp(S-m'),\qquad a=\exp(m-m'),\\
+l' &= a l+\operatorname{rowsum}(P),\\
+A' &= a A+P V_{\mathrm{tile}}.
+\end{align}
+The final output is $A/l$. Fixed-size score tiles avoid full quadratic score storage, while arithmetic remains quadratic and input/output storage still grows with sequence length. This is a CPU forward reference, not an optimized CUDA training kernel.
+\section{Methods}
+The baseline ran on Windows with Python 3.11.4 and NumPy 2.3.5. Tests cover finite differences, broadcast gradients, repeated indexing, stable losses, causality, selected coordinates in all Transformer parameters, optimizer updates and overfitting. Typical finite-difference step size is $10^{-6}$.
+
+The smoke configuration uses vocabulary 8, context 16, width 16, two heads, one layer and seed 42. Four periodic sequences provide 64 target positions reused for 120 AdamW updates with learning rate 0.01 and zero weight decay. No held-out split exists.
+
+The attention pilot uses batch 1, two heads, head dimension 16 and float64. Each method receives a warmup/correctness call and seven timed calls. Dense attention runs first; this ordering and uncontrolled CPU scheduling limit inference.
+\section{Results}
+Twenty-one test methods passed and two optional PyTorch methods were skipped because the dependency was unavailable. The synthetic model contains 3,832 parameters and processes 7,680 token presentations. Loss falls from 2.085474 to 0.003107. Reloaded weights generate the expected periodic sequence.
+\begin{center}
+\begin{tabular}{rrr}\toprule
+Context & Dense median (ms) & Streaming median (ms)\\\midrule
+32 & 0.1153 & 0.1250\\
+64 & 0.2433 & 0.3467\\
+128 & 0.5824 & 0.9792\\
+256 & 4.0029 & 3.7813\\\bottomrule
+\end{tabular}
+\end{center}
+The maximum absolute attention difference is approximately $5.55\times10^{-16}$. The streaming path is not consistently faster. No robust speedup, peak-memory or GPU-traffic claim follows from this pilot.
+\section{Proposed experiments}
+The correctness study will compare full-model trajectories and CUDA backward against independent references. The optimizer study will use equal tuning budgets, shared initializations and independent seeds. The systems study will use explicit baseline backend selection, device timings, memory accounting and profiler evidence. The allocation study will separate fixed-FLOP from fixed-time budgets.
+
+A faster exact kernel can permit more work in a fixed time without changing algorithmic FLOPs for the same workload. The proxy $C\approx6ND$ is only a screening estimate; final accounting must include context-dependent attention and vocabulary costs. Corpus licensing, document-disjoint splits, tokenizer hashes, unique tokens and repeated token presentations will be recorded. Scaling fits require an adequately sampled grid and uncertainty analysis.
+\section{Limitations}
+There is no GPU backend, mixed precision, optimized attention backward, real-corpus training or exact resume. Finite differences test selected values and do not prove all shapes. Synthetic overfit is not language generalization. One seed and short fixed-order CPU timing do not justify uncertainty intervals or scaling exponents. The local GPU reports 6 GB VRAM; the CUDA compiler was not found on PATH.
+\section{Reproducibility and conclusion}
+The original run revision is \texttt{7b5fa9764c6333a21a8ba56207e6fd28681b745b}. Raw configurations, metrics, data fingerprint and weights reside in \texttt{results/smoke}; timing samples reside in \texttt{results/attention.json}. The repository reproduction guide gives exact commands. ForgeML v0.1 establishes a tested CPU starting point. The proposed GPU and scaling contributions remain future work.
+\bibliographystyle{plain}
+\bibliography{references}
+\end{document}
