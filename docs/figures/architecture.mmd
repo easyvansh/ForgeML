@@ -1,0 +1,13 @@
+flowchart LR
+  DATA[Local text + hash] --> BATCH[Deterministic batches]
+  BATCH --> TENSOR[ForgeML Tensor]
+  TENSOR --> AD[Reverse-mode autodiff]
+  AD --> MODEL[Decoder Transformer]
+  MODEL --> LOSS[Stable cross entropy]
+  LOSS --> OPT[SGD / Adam / AdamW]
+  OPT --> CKPT[Metrics + checkpoint]
+  MODEL --> REF[CPU attention reference]
+  MODEL --> TORCH[PyTorch CUDA baseline]
+  TORCH --> PROFILE[CUDA events + memory]
+  MODEL -. future .-> CUSTOM[Custom CUDA forward/backward]
+  CUSTOM -. future .-> PROFILE

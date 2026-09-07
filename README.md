@@ -83,3 +83,7 @@ The local GPU reports 6 GB VRAM. CUDA compiler availability must be resolved bef
 No CUDA backend, mixed precision, attention backward optimization, real-corpus pipeline, scaling-law fit, or publishable GPU findings are claimed. Weight files support inference, not exact training resume. All tensors currently use float64. Matrix multiplication deliberately requires rank ≥ 2. Gradients are retained on leaves only. Do not modify tensor data between forward and backward. The Transformer currently has no dropout in its blocks, although a tested standalone dropout layer is available.
 
 No remote repository has been created. This is a local Git repository. No distribution license has been selected yet; choose one before publishing.
+
+## Visual research record
+
+The [figure manifest](docs/figures/README.md) collects the architecture diagram, online-attention algorithm, and measured GPU baseline charts. Every chart points back to `results/torch_attention.json`; it is intended to make the system inspectable and the evidence easy to review.
