@@ -14,6 +14,7 @@ Research question: under a limited budget, how should small Transformer models t
 - SGD with momentum, Adam, and AdamW.
 - Configured synthetic training, JSONL metrics, weight checkpoints, and greedy integer-token generation.
 - Local character language-model training with deterministic held-out validation, corpus hashing, and metadata.
+- CUDA-enabled PyTorch reference tests and a GPU attention baseline with CUDA-event timings and memory measurements.
 - Dense and tiled online-softmax attention **CPU forward references**.
 - Finite-difference checks, optional PyTorch comparisons, causal tests, and an end-to-end overfit test.
 

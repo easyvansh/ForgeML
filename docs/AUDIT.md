@@ -11,11 +11,13 @@ Updated 2026-09-07. This document is the authoritative status report. A checked 
 - Dense and online-softmax streaming CPU attention references with numerical comparisons.
 - CLI, configs, raw JSONL metrics, checkpoints, findings, engineering log, reproduction guide and paper draft.
 - CUDA toolkit discovery: RTX 3060, `nvcc` 13.3, driver CUDA compatibility 12.6.
+- CUDA-enabled PyTorch 2.14.0+cu126 in `.venv`; `torch.cuda.is_available()` is true on the RTX 3060 Laptop GPU.
+- PyTorch gradient and optimizer parity: 25 tests pass, including both formerly optional reference tests.
+- Reproducible PyTorch CUDA attention baseline at contexts 128, 256 and 512 with CUDA-event timings and memory artifacts.
 
 ## In progress
 
-- CUDA-enabled PyTorch installation in `.venv`. The wheel is approximately 2.6 GB and must finish before PyTorch parity and GPU baselines can run.
-- PyTorch reference tests are present but currently skipped until `import torch` succeeds.
+- Custom CUDA implementation is now the active next milestone; PyTorch is the reference baseline, not ForgeML's custom kernel.
 
 ## Remaining implementation
 
